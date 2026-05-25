@@ -18,6 +18,11 @@ public class Schedule extends BaseEntity {
         this.bookedSeats = new ArrayList<>();
     }
 
+    // Tambahkan method ini di Schedule.java
+    public Schedule getSchedule() {
+        return this;
+    }
+
     public boolean save() {
         String sql = "INSERT INTO schedules (movie_id, studio, show_time, total_seats) VALUES (?, ?, ?, ?)";
         try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {

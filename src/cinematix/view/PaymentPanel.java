@@ -41,7 +41,7 @@ public class PaymentPanel extends JPanel {
         summaryPanel.add(new JLabel("Jumlah Kursi:"));
         summaryPanel.add(new JLabel(String.valueOf(booking.getSelectedSeats().size())));
         summaryPanel.add(new JLabel("Nomor Kursi:"));
-        summaryPanel.add(new JLabel(booking.getSeatsDisplay()));
+        summaryPanel.add(new JLabel(booking.getSeatsDisplay()));  // ← SUDAH MENGGUNAKAN FORMAT BENAR
         summaryPanel.add(new JLabel("Total Harga:"));
         summaryPanel.add(new JLabel(String.format("Rp %,.0f", booking.getTotalPrice())));
 
@@ -101,12 +101,10 @@ public class PaymentPanel extends JPanel {
 
         String paymentMethod = (String) paymentMethodCombo.getSelectedItem();
 
-        // Disable buttons during payment
         btnPay.setEnabled(false);
         btnCancel.setEnabled(false);
         progressBar.setVisible(true);
 
-        // Proses pembayaran dengan multithreading
         paymentController.processPayment(booking, amountPaid, paymentMethod,
                 new PaymentController.PaymentCallback() {
                     @Override
@@ -134,23 +132,5 @@ public class PaymentPanel extends JPanel {
                         btnCancel.setEnabled(true);
                     }
                 });
-    }
-
-    public void updateProgress(int progress) {
-        progressBar.setValue(progress);
-    }
-
-    public void showSuccess(String bookingCode) {
-        progressBar.setValue(100);
-        JOptionPane.showMessageDialog(this,
-                "Pembayaran berhasil!\nKode Booking: " + bookingCode,
-                "Sukses", JOptionPane.INFORMATION_MESSAGE);
-        if (onSuccess != null) onSuccess.run();
-    }
-
-    public void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
-        btnPay.setEnabled(true);
-        btnCancel.setEnabled(true);
     }
 }

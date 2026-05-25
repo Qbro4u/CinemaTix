@@ -14,7 +14,7 @@ public class Booking extends BaseEntity implements Bookable {
     private int scheduleId;
     private List<Integer> selectedSeats;
     private String bookingCode;
-    private String status; // PENDING, CONFIRMED, CANCELLED, EXPIRED
+    private String status;
     private double totalPrice;
     private String paymentMethod;
     private LocalDateTime paymentTime;
@@ -106,7 +106,6 @@ public class Booking extends BaseEntity implements Bookable {
         }
     }
 
-    // PERBAIKAN: Method untuk update booking ke database
     private void updateBookingInDatabase() {
         String sql = "UPDATE bookings SET status = ?, payment_method = ?, payment_time = ? WHERE id = ?";
         try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql)) {
@@ -115,36 +114,69 @@ public class Booking extends BaseEntity implements Bookable {
             pstmt.setTimestamp(3, this.paymentTime != null ? Timestamp.valueOf(this.paymentTime) : null);
             pstmt.setInt(4, this.id);
             pstmt.executeUpdate();
-            System.out.println("Booking updated: status=" + this.status + ", payment_method=" + this.paymentMethod);
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    // PERBAIKAN: Method confirmPayment
     public void confirmPayment(String paymentMethod, double amount) {
-        System.out.println("=== CONFIRM PAYMENT CALLED ===");
-        System.out.println("Payment Method: " + paymentMethod);
-        System.out.println("Amount: " + amount);
-        System.out.println("Booking ID: " + this.id);
-
         this.paymentMethod = paymentMethod;
         this.paymentTime = LocalDateTime.now();
         this.status = "CONFIRMED";
-
         updateBookingInDatabase();
 
-        // ... rest of code
+        String sql = "INSERT INTO tickets (booking_id, ticket_code, issued_at) VALUES (?, ?, ?)";
+        try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql)) {
+            pstmt.setInt(1, this.id);
+            pstmt.setString(2, this.bookingCode + "TKT");
+            pstmt.setTimestamp(3, Timestamp.valueOf(LocalDateTime.now()));
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ============================================================
+    // METHOD KONVERSI SEAT NUMBER KE LABEL (A1, B2, C5, dst)
+    // ============================================================
+    private String convertSeatNumberToLabel(int seatNumber) {
+        // Asumsi layout 10 kolom (A1 - H10)
+        int colsPerRow = 10;
+        int rowIndex = (seatNumber - 1) / colsPerRow;
+        int colIndex = (seatNumber - 1) % colsPerRow;
+
+        String[] rowLetters = {"A", "B", "C", "D", "E", "F", "G", "H"};
+        if (rowIndex >= rowLetters.length) {
+            rowIndex = rowLetters.length - 1;
+        }
+        String rowLetter = rowLetters[rowIndex];
+        int colNumber = colIndex + 1;
+
+        return rowLetter + colNumber;
+    }
+
+    // ============================================================
+    // METHOD GETSEATSDISPLAY (Sudah Diperbaiki)
+    // ============================================================
+    public String getSeatsDisplay() {
+        if (selectedSeats == null || selectedSeats.isEmpty()) {
+            return "-";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < selectedSeats.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(convertSeatNumberToLabel(selectedSeats.get(i)));
+        }
+        return sb.toString();
     }
 
     // ============================================================
     // METHOD UNTUK RIWAYAT
     // ============================================================
-
     public static List<Booking> getBookingsByCustomer(int customerId) {
         List<Booking> bookings = new ArrayList<>();
-        // PASTIKAN SQL mengambil semua kolom termasuk payment_method dan payment_time
-        String sql = "SELECT id, booking_code, customer_id, schedule_id, total_price, status, payment_method, payment_time, booking_time FROM bookings WHERE customer_id = ? ORDER BY booking_time DESC";
+        String sql = "SELECT * FROM bookings WHERE customer_id = ? ORDER BY booking_time DESC";
 
         try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql)) {
             pstmt.setInt(1, customerId);
@@ -158,28 +190,17 @@ public class Booking extends BaseEntity implements Bookable {
                 booking.scheduleId = rs.getInt("schedule_id");
                 booking.totalPrice = rs.getDouble("total_price");
                 booking.status = rs.getString("status");
-
-                // PERBAIKAN: Ambil payment_method dan payment_time dari database
                 booking.paymentMethod = rs.getString("payment_method");
-
-                if (rs.getTimestamp("payment_time") != null) {
-                    booking.paymentTime = rs.getTimestamp("payment_time").toLocalDateTime();
-                }
 
                 if (rs.getTimestamp("booking_time") != null) {
                     booking.createdAt = rs.getTimestamp("booking_time").toLocalDateTime();
                 }
+                if (rs.getTimestamp("payment_time") != null) {
+                    booking.paymentTime = rs.getTimestamp("payment_time").toLocalDateTime();
+                }
 
-                // Load schedule
                 booking.schedule = Schedule.findById(booking.scheduleId);
-
-                // Load selected seats
                 booking.loadSelectedSeatsForHistory();
-
-                // Debug: cetak ke console
-                System.out.println("Loaded booking: " + booking.bookingCode +
-                        ", paymentMethod: " + booking.paymentMethod +
-                        ", paymentTime: " + booking.paymentTime);
 
                 bookings.add(booking);
             }
@@ -188,6 +209,7 @@ public class Booking extends BaseEntity implements Bookable {
         }
         return bookings;
     }
+
     private void loadSelectedSeatsForHistory() {
         selectedSeats.clear();
         String sql = "SELECT seat_number FROM booked_seats WHERE booking_id = ?";
@@ -205,7 +227,6 @@ public class Booking extends BaseEntity implements Bookable {
     // ============================================================
     // GETTERS & SETTERS
     // ============================================================
-
     public Customer getCustomer() { return customer; }
     public void setCustomer(Customer customer) { this.customer = customer; this.customerId = customer.getId(); }
     public int getCustomerId() { return customerId; }
@@ -219,15 +240,6 @@ public class Booking extends BaseEntity implements Bookable {
     public double getTotalPrice() { return totalPrice; }
     public String getPaymentMethod() { return paymentMethod; }
     public LocalDateTime getPaymentTime() { return paymentTime; }
-
-    public String getSeatsDisplay() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < selectedSeats.size(); i++) {
-            if (i > 0) sb.append(", ");
-            sb.append(selectedSeats.get(i));
-        }
-        return sb.toString();
-    }
 
     public String getFormattedCreatedAt() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");

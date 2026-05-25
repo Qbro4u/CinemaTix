@@ -16,7 +16,7 @@ public class CustomerDashboard extends JFrame {
         this.bookingController = new BookingController();
 
         setTitle("CinemaTix - Customer Dashboard");
-        setSize(900, 700);
+        setSize(1100, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 

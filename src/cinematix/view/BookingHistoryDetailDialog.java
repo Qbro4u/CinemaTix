@@ -54,21 +54,17 @@ public class BookingHistoryDetailDialog extends JDialog {
             addSeparator(ticketCard);
         }
 
-        addInfoRow(ticketCard, "Nomor Kursi", booking.getSeatsDisplay());
+        addInfoRow(ticketCard, "Nomor Kursi", booking.getSeatsDisplay());  // ← SUDAH FORMAT BENAR
         addInfoRow(ticketCard, "Jumlah Tiket", String.valueOf(booking.getSelectedSeats().size()));
         addInfoRow(ticketCard, "Total Harga", "Rp " + String.format("%,.0f", booking.getTotalPrice()));
 
-        if (booking.getPaymentMethod() != null && !booking.getPaymentMethod().isEmpty()) {
+        if (booking.getPaymentMethod() != null) {
             addInfoRow(ticketCard, "Metode Pembayaran", booking.getPaymentMethod());
-        } else {
-            addInfoRow(ticketCard, "Metode Pembayaran", "-");
         }
 
         if (booking.getPaymentTime() != null) {
             addInfoRow(ticketCard, "Waktu Pembayaran",
                     booking.getPaymentTime().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss")));
-        } else {
-            addInfoRow(ticketCard, "Waktu Pembayaran", "-");
         }
 
         addInfoRow(ticketCard, "Waktu Pemesanan", booking.getFormattedCreatedAt());
@@ -93,10 +89,6 @@ public class BookingHistoryDetailDialog extends JDialog {
 
         add(mainPanel, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
-
-        // Di method initComponents(), cari bagian penambahan info row:
-
-
     }
 
     private void addInfoRow(JPanel panel, String label, String value) {
@@ -115,7 +107,6 @@ public class BookingHistoryDetailDialog extends JDialog {
 
         panel.add(rowPanel);
         panel.add(Box.createVerticalStrut(8));
-
     }
 
     private void addSeparator(JPanel panel) {

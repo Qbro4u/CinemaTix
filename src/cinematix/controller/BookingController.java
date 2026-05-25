@@ -35,7 +35,7 @@ public class BookingController {
         // Buka Seat Selection Dialog
         JDialog seatDialog = new JDialog(SwingUtilities.getWindowAncestor(parent), "Pilih Kursi",
                 Dialog.ModalityType.APPLICATION_MODAL);
-        seatDialog.setSize(800, 650);
+        seatDialog.setSize(1200, 700);
         seatDialog.setLocationRelativeTo(parent);
 
         SeatSelectionPanel seatPanel = new SeatSelectionPanel(schedule, this);
@@ -54,19 +54,14 @@ public class BookingController {
     }
 
     public void createBookingAndProceedToPayment(Schedule schedule, List<Integer> selectedSeats, SeatSelectionPanel seatPanel) {
-        // Reserve seats
         try {
             for (int seat : selectedSeats) {
                 currentBooking.reserveSeat(seat);
             }
             currentBooking.calculateTotal();
 
-            // Simpan booking ke database
             if (currentBooking.saveToDatabase()) {
-                // Tutup dialog pilih kursi
                 SwingUtilities.getWindowAncestor(seatPanel).dispose();
-
-                // Mulai proses pembayaran
                 proceedToPayment();
             } else {
                 seatPanel.showError("Gagal menyimpan booking ke database!");
@@ -75,9 +70,8 @@ public class BookingController {
             seatPanel.showError(e.getMessage());
         }
     }
-
+    // Contoh perbaikan di BookingController.java
     private void proceedToPayment() {
-        // Buka dialog pembayaran
         JDialog paymentDialog = new JDialog();
         paymentDialog.setTitle("CinemaTix - Pembayaran");
         paymentDialog.setModal(true);
@@ -85,30 +79,32 @@ public class BookingController {
         paymentDialog.setLocationRelativeTo(null);
         paymentDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
 
+        // Buat final copy untuk digunakan di lambda
+        final JDialog finalPaymentDialog = paymentDialog;
+        final BookingTimer finalTimer = bookingTimer;
+
         PaymentPanel paymentPanel = new PaymentPanel(currentBooking, paymentController,
                 () -> {
-                    // On Success - Tampilkan struk tiket
-                    paymentDialog.dispose();
-                    bookingTimer.stop();
+                    // On Success
+                    finalPaymentDialog.dispose();
+                    if (finalTimer != null) finalTimer.stop();
                     showTicketConfirmation();
                 },
                 () -> {
-                    // On Cancel - Batalkan booking
-                    int confirm = JOptionPane.showConfirmDialog(paymentDialog,
+                    // On Cancel
+                    int confirm = JOptionPane.showConfirmDialog(finalPaymentDialog,
                             "Batalkan pemesanan? Kursi yang sudah dipilih akan dibuka kembali.",
                             "Konfirmasi", JOptionPane.YES_NO_OPTION);
                     if (confirm == JOptionPane.YES_OPTION) {
                         currentBooking.cancelBooking(currentBooking.getBookingCode());
-                        bookingTimer.stop();
-                        paymentDialog.dispose();
-                        JOptionPane.showMessageDialog(null, "Pemesanan dibatalkan.", "Info", JOptionPane.INFORMATION_MESSAGE);
+                        if (finalTimer != null) finalTimer.stop();
+                        finalPaymentDialog.dispose();
                     }
                 });
 
         paymentDialog.add(paymentPanel);
         paymentDialog.setVisible(true);
     }
-
     private void showTicketConfirmation() {
         // PERBAIKAN: Gunakan constructor yang benar
         JDialog ticketDialog = new JDialog((JFrame) null, "CinemaTix - Tiket Anda", true);
