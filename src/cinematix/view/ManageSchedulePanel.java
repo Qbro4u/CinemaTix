@@ -8,8 +8,10 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 import java.sql.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +20,7 @@ public class ManageSchedulePanel extends JPanel {
     private JTable scheduleTable;
     private DefaultTableModel tableModel;
     private JComboBox<String> movieFilter;
+    private JComboBox<String> dateFilter;  // TAMBAHAN: Filter tanggal
     private JCheckBox showInactiveMoviesCheckbox;
 
     public ManageSchedulePanel(JFrame parent) {
@@ -37,13 +40,35 @@ public class ManageSchedulePanel extends JPanel {
 
         // Filter Panel
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        filterPanel.add(new JLabel("Filter Film:"));
+
+        // Filter Film
+        filterPanel.add(new JLabel("Film:"));
         movieFilter = new JComboBox<>();
         movieFilter.addItem("Semua Film");
         movieFilter.addActionListener(e -> loadSchedules());
         filterPanel.add(movieFilter);
 
-        showInactiveMoviesCheckbox = new JCheckBox("Tampilkan film tidak aktif di daftar film");
+        // ============================================================
+        // TAMBAHAN: Filter Tanggal (Hari Ini, Besok, Pilih Tanggal)
+        // ============================================================
+        filterPanel.add(new JLabel("  Tanggal:"));
+
+        dateFilter = new JComboBox<>();
+        dateFilter.addItem("📅 Semua Tanggal");
+        dateFilter.addItem("🟢 Hari Ini - " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        dateFilter.addItem("🔜 Besok - " + LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        dateFilter.addItem("📆 Pilih Tanggal Lain...");
+        dateFilter.addActionListener(e -> {
+            if (dateFilter.getSelectedItem() == "📆 Pilih Tanggal Lain...") {
+                showDatePickerDialog();
+            } else {
+                loadSchedules();
+            }
+        });
+        filterPanel.add(dateFilter);
+
+        // Checkbox film tidak aktif
+        showInactiveMoviesCheckbox = new JCheckBox("Tampilkan film tidak aktif");
         showInactiveMoviesCheckbox.addActionListener(e -> loadMovieFilter());
         filterPanel.add(showInactiveMoviesCheckbox);
 
@@ -99,7 +124,7 @@ public class ManageSchedulePanel extends JPanel {
 
         // Info Panel
         JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JLabel infoLabel = new JLabel("💡 Informasi: Film yang tidak aktif tetap bisa diatur jadwalnya. Aktifkan film terlebih dahulu agar muncul di customer.");
+        JLabel infoLabel = new JLabel("💡 Informasi: Film yang tidak aktif tetap bisa diatur jadwalnya. Gunakan filter tanggal untuk melihat jadwal hari ini/besok.");
         infoLabel.setFont(new Font("Arial", Font.ITALIC, 11));
         infoLabel.setForeground(Color.GRAY);
         infoPanel.add(infoLabel);
@@ -107,12 +132,101 @@ public class ManageSchedulePanel extends JPanel {
         // Top Panel
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.add(titleLabel, BorderLayout.WEST);
-        topPanel.add(filterPanel, BorderLayout.CENTER);
-        topPanel.add(buttonPanel, BorderLayout.EAST);
+
+        JPanel filterAndButtonPanel = new JPanel(new BorderLayout());
+        filterAndButtonPanel.add(filterPanel, BorderLayout.WEST);
+        filterAndButtonPanel.add(buttonPanel, BorderLayout.EAST);
+        topPanel.add(filterAndButtonPanel, BorderLayout.CENTER);
 
         add(topPanel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
         add(infoPanel, BorderLayout.SOUTH);
+    }
+
+    // ============================================================
+    // TAMBAHAN: Dialog Pilih Tanggal
+    // ============================================================
+    private void showDatePickerDialog() {
+        JDialog dateDialog = new JDialog(parent, "Pilih Tanggal", true);
+        dateDialog.setSize(300, 200);
+        dateDialog.setLocationRelativeTo(parent);
+        dateDialog.setLayout(new BorderLayout());
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+
+        // Date picker menggunakan JSpinner
+        JSpinner dateSpinner = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor dateEditor = new JSpinner.DateEditor(dateSpinner, "dd/MM/yyyy");
+        dateSpinner.setEditor(dateEditor);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        panel.add(new JLabel("Pilih Tanggal:"), gbc);
+        gbc.gridx = 1;
+        panel.add(dateSpinner, gbc);
+
+        JPanel buttonPanel = new JPanel();
+        JButton btnOk = new JButton("Tampilkan");
+        btnOk.addActionListener(e -> {
+            java.util.Date selectedDate = (java.util.Date) dateSpinner.getValue();
+            LocalDate localDate = selectedDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+
+            // Update combo box dengan tanggal yang dipilih
+            String customDate = "📅 " + localDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            dateFilter.addItem(customDate);
+            dateFilter.setSelectedItem(customDate);
+
+            dateDialog.dispose();
+            loadSchedules();
+        });
+
+        JButton btnCancel = new JButton("Batal");
+        btnCancel.addActionListener(e -> {
+            dateFilter.setSelectedIndex(0);
+            dateDialog.dispose();
+        });
+
+        buttonPanel.add(btnOk);
+        buttonPanel.add(btnCancel);
+
+        dateDialog.add(panel, BorderLayout.CENTER);
+        dateDialog.add(buttonPanel, BorderLayout.SOUTH);
+        dateDialog.setVisible(true);
+    }
+
+    // ============================================================
+    // METHOD UNTUK MENDAPATKAN FILTER TANGGAL
+    // ============================================================
+    private String getDateFilterCondition() {
+        String selectedDate = (String) dateFilter.getSelectedItem();
+        if (selectedDate == null || selectedDate.equals("📅 Semua Tanggal")) {
+            return "";
+        }
+
+        LocalDate targetDate = null;
+
+        if (selectedDate.contains("Hari Ini")) {
+            targetDate = LocalDate.now();
+        } else if (selectedDate.contains("Besok")) {
+            targetDate = LocalDate.now().plusDays(1);
+        } else if (selectedDate.contains("📅") && !selectedDate.equals("📆 Pilih Tanggal Lain...")) {
+            // Parse tanggal dari format "📅 dd/MM/yyyy"
+            String dateStr = selectedDate.substring(3);
+            try {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                targetDate = LocalDate.parse(dateStr, formatter);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (targetDate != null) {
+            return " AND DATE(s.show_time) = '" + targetDate.toString() + "'";
+        }
+
+        return "";
     }
 
     private void loadMovieFilter() {
@@ -158,7 +272,6 @@ public class ManageSchedulePanel extends JPanel {
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Gagal memuat data film: " + e.getMessage());
         }
         return movies;
     }
@@ -189,7 +302,6 @@ public class ManageSchedulePanel extends JPanel {
     }
 
     private void loadSchedules() {
-        // Clear table terlebih dahulu
         tableModel.setRowCount(0);
 
         try {
@@ -203,135 +315,107 @@ public class ManageSchedulePanel extends JPanel {
                 selectedMovieTitle = selectedItem.substring(3).replace(" (Tidak Aktif)", "");
             }
 
-            List<Movie> movies = getAllMovies();
+            // Bangun query dengan filter tanggal
+            String dateFilterCondition = getDateFilterCondition();
 
-            if (movies == null || movies.isEmpty()) {
-                tableModel.addRow(new Object[]{"-", "Tidak ada data film", "-", "-", "-", "-", "-"});
-                return;
-            }
+            String sql = "SELECT s.id, s.movie_id, s.studio, s.show_time, s.total_seats, " +
+                    "m.title, m.is_active " +
+                    "FROM schedules s " +
+                    "JOIN movies m ON s.movie_id = m.id " +
+                    "WHERE 1=1 " + dateFilterCondition +
+                    " ORDER BY s.show_time";
 
-            for (Movie movie : movies) {
-                if (movie == null) continue;
+            try (Statement stmt = DatabaseConnection.getConnection().createStatement();
+                 ResultSet rs = stmt.executeQuery(sql)) {
 
-                if (!selectedItem.equals("Semua Film") && !movie.getTitle().equals(selectedMovieTitle)) {
-                    continue;
-                }
+                while (rs.next()) {
+                    int movieId = rs.getInt("movie_id");
+                    String movieTitle = rs.getString("title");
+                    boolean isMovieActive = rs.getBoolean("is_active");
 
-                List<Schedule> schedules = getSchedulesByMovie(movie.getId());
+                    // Filter berdasarkan film yang dipilih
+                    if (!selectedItem.equals("Semua Film") && !movieTitle.equals(selectedMovieTitle)) {
+                        continue;
+                    }
 
-                if (schedules == null || schedules.isEmpty()) {
-                    String movieStatus = movie.isActive() ? "🟢 Aktif" : "🔴 Tidak Aktif";
+                    int scheduleId = rs.getInt("id");
+                    String studio = rs.getString("studio");
+                    Timestamp showTimeStamp = rs.getTimestamp("show_time");
+                    LocalDateTime showTime = showTimeStamp != null ? showTimeStamp.toLocalDateTime() : null;
+                    int totalSeats = rs.getInt("total_seats");
+
+                    // Hitung kursi terpakai
+                    int bookedSeats = getBookedSeatsCount(scheduleId);
+                    int availableSeats = totalSeats - bookedSeats;
+
+                    String movieStatus = isMovieActive ? "🟢 Aktif" : "🔴 Tidak Aktif";
+                    String formattedShowTime = showTime != null ?
+                            showTime.format(DateTimeFormatter.ofPattern("EEEE, dd MMM yyyy - HH:mm")) : "-";
+
                     tableModel.addRow(new Object[]{
-                            "-", movie.getTitle(), "-", "Tidak ada jadwal", "-", "-", movieStatus
-                    });
-                    continue;
-                }
-
-                for (Schedule schedule : schedules) {
-                    if (schedule == null) continue;
-
-                    String movieStatus = movie.isActive() ? "🟢 Aktif" : "🔴 Tidak Aktif";
-                    tableModel.addRow(new Object[]{
-                            schedule.getId(),
-                            movie.getTitle(),
-                            schedule.getStudio() != null ? schedule.getStudio() : "-",
-                            schedule.getFormattedShowTime() != null ? schedule.getFormattedShowTime() : "-",
-                            schedule.getTotalSeats(),
-                            schedule.getAvailableSeatsCount() + "/" + schedule.getTotalSeats(),
+                            scheduleId,
+                            movieTitle,
+                            studio,
+                            formattedShowTime,
+                            totalSeats,
+                            availableSeats + "/" + totalSeats,
                             movieStatus
                     });
                 }
             }
 
             if (tableModel.getRowCount() == 0) {
-                tableModel.addRow(new Object[]{"-", "Tidak ada data", "-", "-", "-", "-", "-"});
+                String message = "Tidak ada data";
+                String dateSelected = (String) dateFilter.getSelectedItem();
+                if (dateSelected != null && !dateSelected.equals("📅 Semua Tanggal")) {
+                    message = "Tidak ada jadwal untuk " + dateSelected;
+                }
+                tableModel.addRow(new Object[]{"-", message, "-", "-", "-", "-", "-"});
             }
 
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Error saat memuat jadwal: " + e.getMessage());
-            tableModel.setRowCount(0);
-            tableModel.addRow(new Object[]{"Error", e.getMessage(), "-", "-", "-", "-", "-"});
         }
     }
 
-    private List<Schedule> getSchedulesByMovie(int movieId) {
-        List<Schedule> schedules = new ArrayList<>();
-        String sql = "SELECT * FROM schedules WHERE movie_id = ? ORDER BY show_time";
-
+    private int getBookedSeatsCount(int scheduleId) {
+        String sql = "SELECT COUNT(DISTINCT seat_number) as total FROM booked_seats bs " +
+                "JOIN bookings b ON bs.booking_id = b.id " +
+                "WHERE b.schedule_id = ? AND b.status IN ('PENDING', 'CONFIRMED')";
         try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql)) {
-            pstmt.setInt(1, movieId);
-            ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-                Schedule schedule = new Schedule();
-                schedule.setId(rs.getInt("id"));
-                schedule.setMovieId(rs.getInt("movie_id"));
-                schedule.setStudio(rs.getString("studio"));
-                if (rs.getTimestamp("show_time") != null) {
-                    schedule.setShowTime(rs.getTimestamp("show_time").toLocalDateTime());
-                }
-                schedule.setTotalSeats(rs.getInt("total_seats"));
-
-                // Load movie
-                Movie movie = findMovieById(movieId);
-                if (movie != null) {
-                    schedule.setMovie(movie);
-                }
-
-                schedules.add(schedule);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return schedules;
-    }
-
-    private Movie findMovieById(int movieId) {
-        String sql = "SELECT * FROM movies WHERE id = ?";
-        try (PreparedStatement pstmt = DatabaseConnection.getConnection().prepareStatement(sql)) {
-            pstmt.setInt(1, movieId);
+            pstmt.setInt(1, scheduleId);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                Movie movie = new Movie();
-                movie.setId(rs.getInt("id"));
-                movie.setTitle(rs.getString("title"));
-                movie.setGenre(rs.getString("genre"));
-                movie.setDuration(rs.getInt("duration"));
-                movie.setDirector(rs.getString("director"));
-                movie.setCast(rs.getString("cast"));
-                movie.setTicketPrice(rs.getDouble("ticket_price"));
-                movie.setActive(rs.getBoolean("is_active"));
-                return movie;
+                return rs.getInt("total");
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        return null;
+        return 0;
     }
 
-    // ============================================================
-    // PERBAIKAN: Method refreshData dengan final variable
-    // ============================================================
     private void refreshData() {
-        // Cari tombol refresh
         JButton refreshButton = null;
         Component topComponent = ((BorderLayout) getLayout()).getLayoutComponent(BorderLayout.NORTH);
         if (topComponent instanceof JPanel) {
             JPanel topPanel = (JPanel) topComponent;
-            Component rightComponent = ((BorderLayout) topPanel.getLayout()).getLayoutComponent(BorderLayout.EAST);
-            if (rightComponent instanceof JPanel) {
-                JPanel buttonPanel = (JPanel) rightComponent;
-                for (Component comp : buttonPanel.getComponents()) {
-                    if (comp instanceof JButton && ((JButton) comp).getText().contains("Refresh")) {
-                        refreshButton = (JButton) comp;
-                        break;
+            Component centerComponent = ((BorderLayout) topPanel.getLayout()).getLayoutComponent(BorderLayout.CENTER);
+            if (centerComponent instanceof JPanel) {
+                JPanel filterAndButtonPanel = (JPanel) centerComponent;
+                Component eastComponent = ((BorderLayout) filterAndButtonPanel.getLayout()).getLayoutComponent(BorderLayout.EAST);
+                if (eastComponent instanceof JPanel) {
+                    JPanel buttonPanel = (JPanel) eastComponent;
+                    for (Component comp : buttonPanel.getComponents()) {
+                        if (comp instanceof JButton && ((JButton) comp).getText().contains("Refresh")) {
+                            refreshButton = (JButton) comp;
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        // Buat final copy untuk digunakan di inner class
         final JButton finalRefreshButton = refreshButton;
 
         if (finalRefreshButton != null) {
@@ -339,7 +423,6 @@ public class ManageSchedulePanel extends JPanel {
             finalRefreshButton.setText("Memuat...");
         }
 
-        // Gunakan SwingWorker untuk proses refresh di background
         SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() throws Exception {
@@ -363,6 +446,7 @@ public class ManageSchedulePanel extends JPanel {
     }
 
     private void openScheduleDialog(Schedule existingSchedule) {
+        // ... (kode tetap sama seperti sebelumnya)
         JDialog dialog = new JDialog(parent, existingSchedule == null ? "Tambah Jadwal" : "Edit Jadwal", true);
         dialog.setSize(450, 480);
         dialog.setLocationRelativeTo(parent);
@@ -373,7 +457,6 @@ public class ManageSchedulePanel extends JPanel {
         gbc.insets = new Insets(8, 8, 8, 8);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Movie ComboBox
         JComboBox<String> movieCombo = new JComboBox<>();
         List<Movie> movies = getAllMovies();
         for (Movie movie : movies) {
@@ -384,18 +467,14 @@ public class ManageSchedulePanel extends JPanel {
             movieCombo.addItem(displayName);
         }
 
-        // Studio ComboBox
-        JComboBox<String> studioCombo = new JComboBox<>(new String[]{"Studio A", "Studio B", "Studio C", "Studio D"});
+        JComboBox<String> studioCombo = new JComboBox<>(new String[]{"Studio A", "Studio B", "Studio C", "Studio D", "Studio E"});
 
-        // Date and Time Spinner
         JSpinner dateSpinner = new JSpinner(new SpinnerDateModel());
         JSpinner.DateEditor dateEditor = new JSpinner.DateEditor(dateSpinner, "dd/MM/yyyy HH:mm");
         dateSpinner.setEditor(dateEditor);
 
-        // Total Seats Spinner
         JSpinner totalSeatsSpinner = new JSpinner(new SpinnerNumberModel(80, 30, 200, 10));
 
-        // Warning Label
         JLabel warningLabel = new JLabel("⚠️ Film yang tidak aktif tidak akan terlihat oleh customer");
         warningLabel.setForeground(Color.ORANGE);
         warningLabel.setFont(new Font("Arial", Font.ITALIC, 11));
@@ -428,7 +507,6 @@ public class ManageSchedulePanel extends JPanel {
 
         y++; gbc.gridx = 0; gbc.gridy = y; gbc.gridwidth = 2; formPanel.add(warningLabel, gbc);
 
-        // Button Panel
         JPanel buttonPanel = new JPanel();
         JButton btnSave = new JButton("Simpan");
         btnSave.setBackground(new Color(70, 130, 200));
@@ -436,15 +514,9 @@ public class ManageSchedulePanel extends JPanel {
         btnSave.setCursor(new Cursor(Cursor.HAND_CURSOR));
         btnSave.addActionListener(e -> {
             String selectedMovie = (String) movieCombo.getSelectedItem();
-            if (selectedMovie == null) {
-                JOptionPane.showMessageDialog(dialog, "Pilih film terlebih dahulu!");
-                return;
-            }
-
             if (selectedMovie.startsWith("🔴 ")) {
                 selectedMovie = selectedMovie.substring(3).replace(" (Tidak Aktif)", "");
             }
-
             Movie movie = findMovieByTitle(selectedMovie);
 
             if (movie == null) {
@@ -452,7 +524,6 @@ public class ManageSchedulePanel extends JPanel {
                 return;
             }
 
-            // Warning jika film tidak aktif
             if (!movie.isActive()) {
                 int confirm = JOptionPane.showConfirmDialog(dialog,
                         "Film '" + movie.getTitle() + "' sedang dalam status TIDAK AKTIF.\n" +
@@ -551,7 +622,6 @@ public class ManageSchedulePanel extends JPanel {
                 JOptionPane.WARNING_MESSAGE);
 
         if (confirm == JOptionPane.YES_OPTION) {
-            // Cek apakah ada booking
             if (hasBookings(scheduleId)) {
                 int confirmBooking = JOptionPane.showConfirmDialog(this,
                         "Jadwal ini memiliki data booking tiket.\n" +
@@ -607,9 +677,9 @@ public class ManageSchedulePanel extends JPanel {
 
             if (!isSelected && column == 6 && value != null) {
                 String status = value.toString();
-                if (status.contains("Aktif")) {
+                if (status.contains("🟢")) {
                     c.setForeground(new Color(0, 150, 0));
-                } else if (status.contains("Tidak Aktif")) {
+                } else if (status.contains("🔴")) {
                     c.setForeground(Color.RED);
                 } else {
                     c.setForeground(Color.BLACK);

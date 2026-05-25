@@ -64,7 +64,7 @@ public class CustomerDashboard extends JFrame {
         menuBooking.add(menuHistory);
 
         // ===== MENU HELP =====
-        JMenu menuHelp = new JMenu("Help");
+        JMenu menuHelp = new JMenu("About");
         JMenuItem menuAbout = new JMenuItem("About");
         menuAbout.addActionListener(e -> showAbout());
         menuHelp.add(menuAbout);
@@ -202,10 +202,12 @@ public class CustomerDashboard extends JFrame {
         JOptionPane.showMessageDialog(this,
                 "CinemaTix - Sistem Pemesanan Tiket Bioskop\n\n" +
                         "Version 1.0\n\n" +
+                        "Creator : \n" +
+                        "Krocasadigandra Arzaq Kubro Muhammad / 123240015\n" +
+                        "Radja Azahra Kusuma / 123240012\n" +
                         "Aplikasi ini dibuat untuk memenuhi:\n" +
-                        "- Praktikum Pemrograman Berorientasi Objek\n" +
-                        "- Implementasi MVC, OOP, Database, Multithreading\n\n" +
-                        "© 2024 CinemaTix",
+                        "- Praktikum Pemrograman Berorientasi Objek\n\n" +
+                        "© 2026 CinemaTix",
                 "About", JOptionPane.INFORMATION_MESSAGE);
     }
 
